@@ -6,7 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="7d9db71a-c4f2-4b79-91c4-17f227d0a714" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/KurierX/UI/ActivationView.swift" beforeDir="false" afterPath="$PROJECT_DIR$/KurierX/UI/ActivationView.swift" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/KurierX/Services/LicenseService.swift" beforeDir="false" afterPath="$PROJECT_DIR$/KurierX/Services/LicenseService.swift" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -3,6 +3,7 @@ import FirebaseAuth
 import FirebaseFirestore
 import CryptoKit
 import UIKit
+import FirebaseCore
 
 @MainActor final class SessionStore: ObservableObject {
     @Published var state: State = .loading

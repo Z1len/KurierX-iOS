@@ -5,19 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7d9db71a-c4f2-4b79-91c4-17f227d0a714" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/FIRESTORE-RULES-IOS-NOTE.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/KurierX/App/KurierXApp.swift" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/KurierX/Models/Models.swift" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/KurierX/Resources/GoogleService-Info.plist" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/KurierX/Services/LicenseService.swift" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/KurierX/Services/OCRService.swift" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/KurierX/UI/ActivationView.swift" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/KurierX/UI/MainShell.swift" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/KurierX/UI/OwnerView.swift" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/KurierX/UI/RootView.swift" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README-FIRST-BUILD.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/codemagic.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/KurierX/UI/ActivationView.swift" beforeDir="false" afterPath="$PROJECT_DIR$/KurierX/UI/ActivationView.swift" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -53,6 +42,11 @@
     "last_opened_file_path": "C:/Users/Nasir/Documents/GitHub/KurierX-iOS"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\Nasir\Documents\GitHub\KurierX-iOS" />
+    </key>
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="7d9db71a-c4f2-4b79-91c4-17f227d0a714" name="Changes" comment="" />
@@ -62,5 +56,8 @@
       <updated>1787834720670</updated>
     </task>
     <servers />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="*.swift" />
   </component>
 </project>

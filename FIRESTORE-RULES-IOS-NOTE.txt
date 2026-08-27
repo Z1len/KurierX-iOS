@@ -1,0 +1,9 @@
+KurierX iOS uses the same Firebase project as Android.
+
+IMPORTANT: the current Firestore device-create rule created during Android setup allowed only:
+    request.resource.data.platform == 'ANDROID'
+
+Change that one condition to:
+    request.resource.data.platform in ['ANDROID', 'IOS']
+
+Do not weaken any other rule.

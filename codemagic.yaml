@@ -1,0 +1,47 @@
+workflows:
+  ios-simulator:
+    name: KurierX iOS Simulator Build
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: xcodegen generate
+      - name: Resolve Swift packages
+        script: xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX
+      - name: Build for iOS Simulator
+        script: |
+          set -o pipefail
+          xcodebuild -project KurierX.xcodeproj -scheme KurierX -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build | xcpretty
+    artifacts:
+      - ~/Library/Developer/Xcode/DerivedData/**/Build/Products/Debug-iphonesimulator/*.app
+
+  ios-device-unsigned:
+    name: KurierX iPhone Unsigned Build
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: xcodegen generate
+      - name: Resolve Swift packages
+        script: xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX
+      - name: Build for physical iPhone without signing
+        script: |
+          set -euo pipefail
+          xcodebuild -project KurierX.xcodeproj -scheme KurierX -sdk iphoneos -configuration Release -derivedDataPath "$CM_BUILD_DIR/DerivedData" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | xcpretty
+          APP="$CM_BUILD_DIR/DerivedData/Build/Products/Release-iphoneos/KurierX.app"
+          test -d "$APP"
+          mkdir -p "$CM_BUILD_DIR/ipa/Payload"
+          cp -R "$APP" "$CM_BUILD_DIR/ipa/Payload/KurierX.app"
+          cd "$CM_BUILD_DIR/ipa"
+          zip -qry "$CM_BUILD_DIR/KurierX-unsigned.ipa" Payload
+    artifacts:
+      - KurierX-unsigned.ipa
+      - DerivedData/Build/Products/Release-iphoneos/KurierX.app

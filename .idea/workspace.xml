@@ -5,17 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7d9db71a-c4f2-4b79-91c4-17f227d0a714" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/KurierX/App/KurierXApp.swift" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/KurierX/Models/Models.swift" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/KurierX/Services/LicenseService.swift" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/KurierX/Services/OCRService.swift" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/KurierX/UI/ActivationView.swift" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/KurierX/UI/MainShell.swift" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/KurierX/UI/OwnerView.swift" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/KurierX/UI/RootView.swift" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/README-FIRST-BUILD.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/codemagic.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/project.yml" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/FIRESTORE-RULES-IOS-NOTE.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/KurierX/App/KurierXApp.swift" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/KurierX/Models/Models.swift" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/KurierX/Resources/GoogleService-Info.plist" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/KurierX/Services/LicenseService.swift" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/KurierX/Services/OCRService.swift" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/KurierX/UI/ActivationView.swift" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/KurierX/UI/MainShell.swift" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/KurierX/UI/OwnerView.swift" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/KurierX/UI/RootView.swift" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README-FIRST-BUILD.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/codemagic.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/project.yml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,7 +49,8 @@
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
     "git-widget-placeholder": "main",
-    "kotlin-language-version-configured": "true"
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/Nasir/Documents/GitHub/KurierX-iOS"
   }
 }]]></component>
   <component name="TaskManager">

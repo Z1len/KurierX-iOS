@@ -39,7 +39,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var note: String = ""
     var deletedAt: Date?
 
-    init(date: Date = .now, warehouse: Warehouse = .liboc, status: ShiftStatus = .planned, plannedRings: Int = 0) {
+    init(date: Date = Date.now, warehouse: Warehouse = .liboc, status: ShiftStatus = .planned, plannedRings: Int = 0) {
         id = UUID(); self.date = date; warehouseRaw = warehouse.rawValue; statusRaw = status.rawValue
         self.plannedRings = plannedRings; note = ""
     }
@@ -54,7 +54,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
 @Model final class Route {
     @Attribute(.unique) var id: UUID
     var shiftID: UUID
-    var date: Date = .now
+    var date: Date = Date.now
     var sequence: Int
     var typeRaw: String
     var warehouseRaw: String = Warehouse.liboc.rawValue
@@ -66,7 +66,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var note: String = ""
     var deletedAt: Date?
 
-    init(shiftID: UUID, date: Date = .now, sequence: Int, type: RouteType, warehouse: Warehouse = .liboc, plannedOrders: Int = 0, factualOrders: Int = 0, tipsHellers: Int64 = 0) {
+    init(shiftID: UUID, date: Date = Date.now, sequence: Int, type: RouteType, warehouse: Warehouse = .liboc, plannedOrders: Int = 0, factualOrders: Int = 0, tipsHellers: Int64 = 0) {
         id = UUID(); self.shiftID = shiftID; self.date = date; self.sequence = sequence; typeRaw = type.rawValue; warehouseRaw = warehouse.rawValue
         self.plannedOrders = plannedOrders; self.factualOrders = factualOrders; self.tipsHellers = tipsHellers; grossHellers = 0; note = ""
     }
@@ -77,7 +77,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
 @Model final class Customer {
     @Attribute(.unique) var id: UUID
     var routeID: UUID
-    var date: Date = .now
+    var date: Date = Date.now
     var routeSequence: Int = 1
     var routeTypeRaw: String = RouteType.ot.rawValue
     var firstName: String
@@ -88,7 +88,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var note: String = ""
     var deletedAt: Date?
 
-    init(routeID: UUID, date: Date = .now, routeSequence: Int = 1, routeType: RouteType = .ot, firstName: String, lastName: String = "", address: String, bags: Int = 0, tipsHellers: Int64 = 0) {
+    init(routeID: UUID, date: Date = Date.now, routeSequence: Int = 1, routeType: RouteType = .ot, firstName: String, lastName: String = "", address: String, bags: Int = 0, tipsHellers: Int64 = 0) {
         id = UUID(); self.routeID = routeID; self.date = date; self.routeSequence = routeSequence; routeTypeRaw = routeType.rawValue
         self.firstName = firstName; self.lastName = lastName; self.address = address; self.bags = bags; self.tipsHellers = tipsHellers; note = ""
     }
@@ -102,7 +102,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var note: String
     var source: String = "Ручной ввод"
     var deletedAt: Date?
-    init(date: Date = .now, kind: FinancialKind, amountHellers: Int64, note: String = "", source: String = "Ручной ввод") {
+    init(date: Date = Date.now, kind: FinancialKind, amountHellers: Int64, note: String = "", source: String = "Ручной ввод") {
         id = UUID(); self.date = date; kindRaw = kind.rawValue; self.amountHellers = amountHellers; self.note = note; self.source = source
     }
     var kind: FinancialKind { get { FinancialKind(rawValue: kindRaw) ?? .bonus } set { kindRaw = newValue.rawValue } }
@@ -134,7 +134,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var distanceKm: Double
     var note: String
     var deletedAt: Date?
-    init(date: Date = .now, amountHellers: Int64 = 0, liters: Double = 0, distanceKm: Double = 0, note: String = "") { id = UUID(); self.date = date; self.amountHellers = amountHellers; self.liters = liters; self.distanceKm = distanceKm; self.note = note }
+    init(date: Date = Date.now, amountHellers: Int64 = 0, liters: Double = 0, distanceKm: Double = 0, note: String = "") { id = UUID(); self.date = date; self.amountHellers = amountHellers; self.liters = liters; self.distanceKm = distanceKm; self.note = note }
 }
 
 @Model final class AdvanceEntry {
@@ -143,7 +143,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var amountHellers: Int64
     var note: String
     var deletedAt: Date?
-    init(date: Date = .now, amountHellers: Int64 = 0, note: String = "") { id = UUID(); self.date = date; self.amountHellers = amountHellers; self.note = note }
+    init(date: Date = Date.now, amountHellers: Int64 = 0, note: String = "") { id = UUID(); self.date = date; self.amountHellers = amountHellers; self.note = note }
 }
 
 @Model final class AuditEntry {
@@ -152,7 +152,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var kindRaw: String
     var title: String
     var details: String
-    init(date: Date = .now, kind: AuditKind, title: String, details: String = "") { id = UUID(); self.date = date; kindRaw = kind.rawValue; self.title = title; self.details = details }
+    init(date: Date = Date.now, kind: AuditKind, title: String, details: String = "") { id = UUID(); self.date = date; kindRaw = kind.rawValue; self.title = title; self.details = details }
 }
 
 @Model final class AppPreference {

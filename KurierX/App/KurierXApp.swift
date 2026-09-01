@@ -8,9 +8,12 @@ struct KurierXApp: App {
     private let container: ModelContainer
 
     init() {
-        let schema = Schema([Shift.self, Route.self, Customer.self, FinancialEntry.self, Goal.self])
+        let schema = Schema([
+            Shift.self, Route.self, Customer.self, FinancialEntry.self, Goal.self,
+            CalendarPlan.self, FuelEntry.self, AdvanceEntry.self, AuditEntry.self, AppPreference.self
+        ])
         container = try! ModelContainer(for: schema)
-        if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
+        if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil, FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }
     }

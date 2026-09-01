@@ -1,27 +1,24 @@
-# KurierX iOS — rebuilt parity build
+# KurierX iOS FULL v5
 
-This project is a native SwiftUI/SwiftData iOS port based on the current Android KurierX main branch and the working Firebase licensing prototype.
+This project is the iPhone client for KurierX. Android remains in `Z1len/KurierX`; this project belongs in `Z1len/KurierX-iOS`.
 
-Included in this rebuild:
-- Android-style 5-tab navigation: Home / Calendar / Statistics / Scanner / More
-- KurierX dark/green visual system with compact cards and no oversized top spacer
-- Home goal progress, earnings summary, active shift, route cards
-- Calendar month grid with shift time + K count
-- Statistics period selector and charts
-- Vision OCR scanner from Photos with collapsed raw OCR and route creation
-- Clients grouped by date and route
-- Shifts, salary chart, bonuses/penalties, diesel, advances, goals
-- Backup sharing, journal shell, trash restore, advanced mode, settings
-- Firebase activation / freeze / revoke listener
-- Expanded KurierX Control: key generation/copy/delete, user editing, ACTIVE/FROZEN/BLACKLISTED controls, owner exit
-- Keyboard Done toolbar and interactive keyboard dismissal
-- Codemagic simulator and unsigned physical-iPhone workflows
+## What changed in v5
 
-Build on Codemagic:
-1. Push the project contents to the root of the KurierX-iOS repository.
-2. Run `KurierX iOS Simulator Build`.
-3. If green, run `KurierX iPhone Unsigned Build`.
-4. Download `KurierX-unsigned.ipa` and install through SideStore.
+- iPhone-only target + generated modern launch screen to remove the old letterboxed black bars.
+- Custom bottom navigation permanently visible: Главная / Календарь / Статистика / Сканер / Ещё.
+- OWNER no longer gets trapped in KurierX Control. OWNER enters the normal KurierX shell and opens Control from `Ещё`.
+- User activation is compatible with the currently deployed Android Firestore rules, avoiding the iOS `Missing or insufficient permissions` failure.
+- Keyboard dismisses interactively and every form has `Готово` where needed.
+- Main dashboard, active shift, plan, closed routes, calendar, statistics, OCR screen, clients, shifts, bonuses/compensations, penalties, fuel/auto expenses, advances, salary reconciliation, goals, backups, audit, trash, developer mode, mileage, settings, tutorial.
+- Codemagic package resolution retries transient Google/Firebase 502 failures automatically.
 
-Firebase:
-`GoogleService-Info.plist` is already included in `KurierX/Resources`. Firestore rules must allow platform `IOS` in the same places where Android devices are accepted.
+## Build
+
+1. Replace the contents of `Z1len/KurierX-iOS` with this folder and commit to `main`.
+2. Codemagic → `KurierX iOS Simulator Build`.
+3. If green → `KurierX iPhone Unsigned Build`.
+4. Install the resulting `KurierX-unsigned.ipa` through SideStore over the existing app.
+
+## Note about activation compatibility
+
+The deployed Android Firestore rules currently only allow device documents whose `platform` field is `ANDROID` and whose OS field is named `androidVersion`. This iOS build intentionally writes those two compatibility fields while still writing manufacturer `Apple` and the iPhone model. That lets the existing production rules accept iPhone activation without a Firebase-console change.

@@ -1,28 +1,55 @@
 import SwiftUI
-import UIKit
 import SwiftData
-import Charts
 import PhotosUI
+import UIKit
 
 struct MainShell: View {
+    let isOwner: Bool
     @State private var tab: Tab = .home
-    enum Tab: Hashable { case home, calendar, stats, scanner, more }
+    enum Tab: CaseIterable, Hashable { case home, calendar, stats, scanner, more }
 
     var body: some View {
-        TabView(selection: $tab) {
-            NavigationStack { HomeView(openScanner: { tab = .scanner }) }
-                .tabItem { Label("Главная", systemImage: "house") }.tag(Tab.home)
-            NavigationStack { CalendarViewKX() }
-                .tabItem { Label("Календарь", systemImage: "calendar") }.tag(Tab.calendar)
-            NavigationStack { StatsView() }
-                .tabItem { Label("Статистика", systemImage: "chart.bar.xaxis") }.tag(Tab.stats)
-            NavigationStack { ScannerView() }
-                .tabItem { Label("Сканер", systemImage: "qrcode.viewfinder") }.tag(Tab.scanner)
-            NavigationStack { MoreView() }
-                .tabItem { Label("Ещё", systemImage: "ellipsis") }.tag(Tab.more)
+        ZStack(alignment: .bottom) {
+            Color.kxBackground.ignoresSafeArea()
+            Group {
+                switch tab {
+                case .home: NavigationStack { HomeView { tab = .scanner } }
+                case .calendar: NavigationStack { CalendarViewKX() }
+                case .stats: NavigationStack { StatsView() }
+                case .scanner: NavigationStack { ScannerView() }
+                case .more: NavigationStack { MoreView(isOwner: isOwner) }
+                }
+            }
+            .padding(.bottom, 78)
+
+            KXBottomBar(selection: $tab)
         }
-        .toolbarBackground(Color.kxSurface, for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+}
+
+struct KXBottomBar: View {
+    @Binding var selection: MainShell.Tab
+    private let items: [(MainShell.Tab,String,String)] = [
+        (.home,"Главная","house"),(.calendar,"Календарь","calendar"),(.stats,"Статистика","chart.bar.xaxis"),(.scanner,"Сканер","qrcode.viewfinder"),(.more,"Ещё","ellipsis")
+    ]
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(items, id: \.0) { item in
+                Button { selection = item.0 } label: {
+                    VStack(spacing: 4) {
+                        ZStack {
+                            if selection == item.0 { Capsule().fill(Color.kxPurple.opacity(0.75)).frame(width: 54, height: 38) }
+                            Image(systemName: item.2).font(.system(size: 23, weight: .semibold)).foregroundStyle(selection == item.0 ? .white : Color.white.opacity(0.72))
+                        }.frame(height: 40)
+                        Text(item.1).font(.system(size: 11, weight: selection == item.0 ? .semibold : .regular)).foregroundStyle(selection == item.0 ? Color.kxGreen : Color.white.opacity(0.72)).lineLimit(1).minimumScaleFactor(0.7)
+                    }.frame(maxWidth: .infinity)
+                }.buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 4).padding(.top, 8).padding(.bottom, 6)
+        .background(Color.kxSurface2.opacity(0.98))
+        .overlay(alignment: .top) { Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1) }
     }
 }
 
@@ -36,225 +63,203 @@ struct HomeView: View {
     @Query private var advances: [AdvanceEntry]
     @Query private var goals: [Goal]
     let openScanner: () -> Void
-    @State private var showStartShift = false
-    @State private var showAddRoute = false
+    @State private var showStart = false
+    @State private var showPlan = false
+    @State private var plan = "4"
+    @State private var showClose = false
 
     private var activeShift: Shift? { shifts.first { $0.deletedAt == nil && $0.status == .active } }
-    private var activeRoutes: [Route] { routes.filter { $0.deletedAt == nil } }
-    private var factualOrders: Int { activeRoutes.reduce(0) { $0 + $1.factualOrders } }
-    private var tips: Int64 { activeRoutes.reduce(0) { $0 + $1.tipsHellers } }
-    private var routeGross: Int64 { activeRoutes.reduce(0) { $0 + $1.grossHellers } }
+    private var visibleRoutes: [Route] { routes.filter { $0.deletedAt == nil } }
+    private var factualOrders: Int { visibleRoutes.reduce(0) { $0 + $1.factualOrders } }
+    private var tips: Int64 { visibleRoutes.reduce(0) { $0 + $1.tipsHellers } }
+    private var routeGross: Int64 { visibleRoutes.reduce(0) { $0 + EarningsService.routeGross($1) } }
     private var net: Int64 {
-        let fin = finances.filter { $0.deletedAt == nil }.reduce(Int64(0)) { $0 + ($1.kind == .bonus ? $1.amountHellers : -$1.amountHellers) }
+        let f = finances.filter { $0.deletedAt == nil }.reduce(Int64(0)) { $0 + ($1.kind.positive ? $1.amountHellers : -$1.amountHellers) }
         let diesel = fuel.filter { $0.deletedAt == nil }.reduce(Int64(0)) { $0 + $1.amountHellers }
         let adv = advances.filter { $0.deletedAt == nil }.reduce(Int64(0)) { $0 + $1.amountHellers }
-        return routeGross + tips + fin - diesel - adv
+        return routeGross + tips + f - diesel - adv
     }
-    private var currentGoal: Goal? { goals.first { $0.month == Date().monthKey } }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
-                HStack(spacing: 11) {
-                    ZStack { RoundedRectangle(cornerRadius: 14).fill(Color.kxGreen.opacity(0.18)); Image(systemName: "shippingbox.fill").foregroundStyle(Color.kxGreen).font(.title2) }.frame(width: 48, height: 48)
-                    HStack(spacing: 0) { Text("Kurier").font(.system(size: 31, weight: .black, design: .rounded)); Text("X").font(.system(size: 31, weight: .black, design: .rounded)).foregroundStyle(Color.kxGreen) }
-                    Spacer()
-                }
-
-                if let goal = currentGoal, goal.targetOrders > 0 {
-                    GoalProgressCard(current: factualOrders, target: goal.targetOrders)
-                }
-
-                KXCard(content: VStack(alignment: .leading, spacing: 7) {
-                    Text("Заработок по обработанным трассам").font(.caption).foregroundStyle(.secondary)
-                    Text(moneyKc(net)).font(.system(size: 34, weight: .bold, design: .rounded))
-                    Text("\(factualOrders) фактических заказов · чаевые \(moneyKc(tips))").foregroundStyle(.secondary)
-                    Text("Итог учитывает трассы, бонусы, штрафы, дизель и авансы.").font(.caption).foregroundStyle(.secondary)
-                })
-
-                if let shift = activeShift {
-                    ActiveShiftCardIOS(shift: shift, routes: activeRoutes.filter { $0.shiftID == shift.id }, openScanner: openScanner) {
-                        shift.endedAt = .now; shift.status = .complete
-                        try? context.save()
+            VStack(spacing: 16) {
+                KXBrand().padding(.top, 8)
+                if let goal = goals.first(where: { $0.month == Date.now.monthKey }), goal.targetOrders > 0 { GoalProgressCard(current: factualOrders, target: goal.targetOrders) }
+                KXCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Заработок по обработанным трассам").font(.system(size: 15, weight: .semibold))
+                        Text(moneyKc(net)).font(.system(size: 38, weight: .bold, design: .rounded))
+                        Text("\(factualOrders) фактических заказов · чаевые \(moneyKc(tips))").font(.system(size: 16)).foregroundStyle(.secondary)
+                        Text("Итог учитывает трассы, бонусы / компенсации, штрафы, дизель и авансы.").font(.system(size: 14)).foregroundStyle(.secondary)
                     }
+                }
+                if let shift = activeShift {
+                    ActiveShiftCard(shift: shift, routes: visibleRoutes.filter { $0.shiftID == shift.id }, onEditPlan: { plan = String(shift.plannedRings); showPlan = true }, onScanner: openScanner, onClose: { showClose = true })
                 } else {
-                    KXCard(content: VStack(alignment: .leading, spacing: 11) {
-                        Text("Смена не начата").font(.title3.bold())
-                        Text("Рабочее время начнётся после входа в очередь.").foregroundStyle(.secondary)
-                        Button("Přihlásit se do fronty") { showStartShift = true }.buttonStyle(.borderedProminent).tint(Color.kxGreen).frame(maxWidth: .infinity)
-                    })
+                    KXCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Смена не начата").font(.system(size: 23, weight: .bold))
+                            Text("Рабочее время начнётся только после входа в очередь.").foregroundStyle(.secondary)
+                            Button("Přihlásit se do fronty") { showStart = true }.buttonStyle(.borderedProminent).tint(Color.kxGreen).controlSize(.large).frame(maxWidth: .infinity)
+                        }
+                    }
                 }
-
-                if !activeRoutes.isEmpty {
-                    KXHeader(title: "Закрытые трассы")
-                    ForEach(activeRoutes.prefix(8)) { route in RouteSummaryCard(route: route) }
+                if !visibleRoutes.isEmpty {
+                    Text("Закрытые трассы").font(.title2.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                    ForEach(visibleRoutes.prefix(8)) { route in RouteSummaryCard(route: route) }
                 }
-            }.padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 28)
+            }.padding(.horizontal, 18).padding(.bottom, 24)
         }
         .background(Color.kxBackground.ignoresSafeArea())
         .navigationBarHidden(true)
-        .sheet(isPresented: $showStartShift) { ShiftEditorView(existing: nil) }
-        .sheet(isPresented: $showAddRoute) { EmptyView() }
+        .sheet(isPresented: $showStart) { StartShiftSheet() }
+        .alert("Изменить план", isPresented: $showPlan) {
+            TextField("Колечек", text: $plan).keyboardType(.numberPad)
+            Button("Сохранить") { if let shift = activeShift { shift.plannedRings = max(1, Int(plan) ?? 4); try? context.save() } }
+            Button("Отмена", role: .cancel) { }
+        }
+        .alert("Закрыть текущую смену?", isPresented: $showClose) {
+            Button("Закрыть") { if let shift = activeShift { shift.endedAt = Date.now; shift.status = .complete; try? context.save() } }
+            Button("Отмена", role: .cancel) { }
+        }
     }
 }
 
 struct GoalProgressCard: View {
     let current: Int; let target: Int
     var body: some View {
-        KXCard(content: VStack(spacing: 7) {
-            HStack { Text("\(current)").font(.headline).foregroundStyle(Color.kxGreen); Text("/ \(target)"); Spacer(); Text("Цель: \(target) заказов").font(.caption.bold()) }
-            ProgressView(value: Double(current), total: Double(max(1, target))).tint(Color.kxGreen)
-            let remaining = max(0, target-current)
-            Text(remaining == 0 ? "Цель выполнена ✓" : "Осталось \(remaining) заказов").font(.caption).foregroundStyle(remaining == 0 ? Color.kxGreen : .secondary)
-        })
+        KXCard {
+            VStack(spacing: 8) {
+                HStack { Text("\(current)").bold().foregroundStyle(Color.kxGreen); Text("/ \(target)"); Spacer(); Text("Цель: \(target) заказов").font(.caption.bold()) }
+                ProgressView(value: Double(current), total: Double(max(1,target))).tint(Color.kxGreen)
+                Text(current >= target ? "Цель выполнена ✓" : "Осталось \(target-current) заказов").font(.caption).foregroundStyle(current >= target ? Color.kxGreen : .secondary).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 }
 
-struct ActiveShiftCardIOS: View {
-    let shift: Shift; let routes: [Route]; let openScanner: () -> Void; let close: () -> Void
-    var completedRings: Int { routes.reduce(0) { $0 + $1.type.rings } }
+struct ActiveShiftCard: View {
+    let shift: Shift; let routes: [Route]
+    let onEditPlan: () -> Void; let onScanner: () -> Void; let onClose: () -> Void
+    private var completed: Int { routes.reduce(0) { $0 + $1.type.rings } }
     var body: some View {
-        KXCard(content: VStack(spacing: 12) {
-            HStack { VStack(alignment: .leading) { Text("Смена активна").font(.title3.bold()); Text("Старт \(shift.startedAt?.formatted(date: .omitted, time: .shortened) ?? "—")").foregroundStyle(.secondary) }; Spacer(); Text(shift.plannedRings > 0 ? "\(completedRings)/\(shift.plannedRings) K" : "\(completedRings) K").font(.headline).padding(.horizontal, 12).padding(.vertical, 7).background(Color.kxGreen.opacity(0.16), in: RoundedRectangle(cornerRadius: 12)) }
-            if shift.plannedRings > 0 { ProgressView(value: Double(completedRings), total: Double(max(1, shift.plannedRings))).tint(Color.kxGreen) }
-            Button("Добавить закрытую трассу", action: openScanner).buttonStyle(.borderedProminent).tint(Color.kxGreen).frame(maxWidth: .infinity)
-            Button("Закрыть текущую смену", action: close).buttonStyle(.bordered).frame(maxWidth: .infinity)
-        })
+        KXCard {
+            VStack(alignment: .leading, spacing: 15) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Смена активна").font(.system(size: 24, weight: .bold))
+                        Text("Старт \(shift.startedAt?.formatted(date: .omitted, time: .shortened) ?? "—")").font(.system(size: 17)).foregroundStyle(.secondary)
+                    }
+                    Spacer(); Text("\(completed)/\(max(1,shift.plannedRings)) K").font(.title3.bold()).padding(.horizontal, 14).padding(.vertical, 10).background(Color.kxPurple, in: RoundedRectangle(cornerRadius: 14))
+                }
+                Text(completed >= shift.plannedRings ? "План выполнен" : "Осталось по плану: \(max(0, shift.plannedRings-completed)) колечка").font(.system(size: 17))
+                Button("Изменить план", action: onEditPlan).foregroundStyle(Color.kxGreen).fontWeight(.semibold)
+                Button("Добавить закрытую трассу", action: onScanner).buttonStyle(.borderedProminent).tint(Color.kxGreen).controlSize(.large).frame(maxWidth: .infinity)
+                Button("Закрыть текущую смену", action: onClose).buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
+            }
+        }
+    }
+}
+
+struct StartShiftSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @State private var warehouse = Warehouse.liboc
+    @State private var plan = 4
+    @State private var queueOdo = ""
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("Склад", selection: $warehouse) { ForEach(Warehouse.allCases) { Text($0.rawValue).tag($0) } }
+                Stepper("План: \(plan) колечка", value: $plan, in: 1...20)
+                TextField("Спидометр при входе", text: $queueOdo).keyboardType(.decimalPad)
+            }
+            .navigationTitle("Начать смену")
+            .toolbar {
+                KeyboardDoneToolbar()
+                ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Начать") { let s = Shift(date: Date.now, warehouse: warehouse, status: .active, plannedRings: plan); s.startedAt = Date.now; s.queueOdometer = Double(queueOdo.replacingOccurrences(of: ",", with: ".")); context.insert(s); try? context.save(); dismiss() } }
+            }
+        }
     }
 }
 
 struct RouteSummaryCard: View {
     let route: Route
     var body: some View {
-        KXCard(content: VStack(alignment: .leading, spacing: 5) {
-            HStack { Text("✓ \(route.type.rawValue) · \(route.warehouse.rawValue)").font(.headline); Spacer(); if route.grossHellers != 0 { Text(moneyKc(route.grossHellers)).bold() } }
-            Text("\(route.type.rings) колечко · \(route.factualOrders) заказов\(route.distanceKm.map { " · \(String(format: "%.1f", $0)) км" } ?? "")").font(.caption).foregroundStyle(.secondary)
-            if route.tipsHellers > 0 { Text("Чаевые \(moneyKc(route.tipsHellers))").font(.caption).foregroundStyle(Color.kxGreen) }
-        })
+        KXCard {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack { Text("✓ \(route.type.rawValue) · \(route.warehouse.rawValue)").font(.headline); Spacer(); Text(moneyKc(EarningsService.routeGross(route))).bold() }
+                Text("1 колечко · трасса #\(route.sequence) · \(route.factualOrders) заказов\(route.distanceKm.map { " · \(String(format:"%.1f",$0)) км" } ?? "")").font(.caption).foregroundStyle(.secondary)
+                if route.tipsHellers > 0 { Text("Чаевые \(moneyKc(route.tipsHellers))").font(.caption).foregroundStyle(Color.kxGreen) }
+            }
+        }
     }
 }
 
 // MARK: - CALENDAR
 struct CalendarViewKX: View {
-    @Environment(\.modelContext) private var context
     @Query(sort: \CalendarPlan.date) private var plans: [CalendarPlan]
-    @Query(sort: \Shift.date) private var shifts: [Shift]
-    @State private var month = Date()
-    @State private var showAdd = false
-
+    @State private var month = Date.now
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var ocrText = ""
+    @State private var showImport = false
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
-    private var monthInterval: DateInterval { Calendar.current.dateInterval(of: .month, for: month)! }
+
     private var days: [Date?] {
-        let cal = Calendar.current; let start = monthInterval.start
-        let weekday = (cal.component(.weekday, from: start) + 5) % 7
-        let count = cal.range(of: .day, in: .month, for: month)?.count ?? 30
-        return Array(repeating: nil, count: weekday) + (0..<count).compactMap { cal.date(byAdding: .day, value: $0, to: start) }
+        let cal = Calendar.current; let interval = cal.dateInterval(of: .month, for: month)!; let first = interval.start
+        let leading = (cal.component(.weekday, from: first)+5)%7; let count = cal.range(of: .day, in: .month, for: month)?.count ?? 30
+        return Array(repeating: nil, count: leading) + (0..<count).compactMap { cal.date(byAdding: .day, value: $0, to: first) }
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
-                KXHeader(title: "Календарь", subtitle: "План смен и колечек")
-                KXCard(content: VStack(spacing: 12) {
-                    HStack { Button { month = Calendar.current.date(byAdding: .month, value: -1, to: month)! } label: { Image(systemName: "chevron.left.circle.fill").font(.title2) }; Spacer(); Text(month.formatted(.dateTime.month(.wide).year())).font(.title2.bold()).textCase(nil); Spacer(); Button { month = Calendar.current.date(byAdding: .month, value: 1, to: month)! } label: { Image(systemName: "chevron.right.circle.fill").font(.title2) } }
-                    LazyVGrid(columns: columns, spacing: 6) {
-                        ForEach(["ПН","ВТ","СР","ЧТ","ПТ","СБ","ВС"], id: \.self) { Text($0).font(.caption2.bold()).foregroundStyle(.secondary) }
-                        ForEach(Array(days.enumerated()), id: \.offset) { _, day in
-                            if let day { CalendarCell(day: day, plan: plans.first { Calendar.current.isDate($0.date, inSameDayAs: day) }, shift: shifts.first { $0.deletedAt == nil && Calendar.current.isDate($0.date, inSameDayAs: day) }) }
-                            else { Color.clear.frame(height: 70) }
+            VStack(spacing: 16) {
+                HStack { KXHeader(title: "Календарь", subtitle: "План смен и колечек"); Button("Сегодня") { month = Date.now }.foregroundStyle(Color.kxGreen) }.padding(.top, 10)
+                KXCard {
+                    VStack(spacing: 14) {
+                        HStack { Button { month = Calendar.current.date(byAdding: .month, value: -1, to: month)! } label: { Image(systemName: "chevron.left.circle.fill").font(.title) }; Spacer(); Text(month.formatted(.dateTime.month(.wide).year())).font(.system(size: 25, weight: .bold)); Spacer(); Button { month = Calendar.current.date(byAdding: .month, value: 1, to: month)! } label: { Image(systemName: "chevron.right.circle.fill").font(.title) } }
+                        LazyVGrid(columns: columns, spacing: 7) {
+                            ForEach(["ПН","ВТ","СР","ЧТ","ПТ","СБ","ВС"], id:\.self) { Text($0).font(.caption.bold()).foregroundStyle(.secondary) }
+                            ForEach(Array(days.enumerated()), id:\.offset) { _, day in
+                                if let day { CalendarDayCell(day: day, plan: plans.first { $0.date.sameDay(as: day) }) } else { Color.clear.frame(height: 83) }
+                            }
                         }
                     }
-                })
-                Button("Добавить / изменить день") { showAdd = true }.buttonStyle(.borderedProminent).tint(Color.kxGreen).frame(maxWidth: .infinity)
-            }.padding(16).padding(.bottom, 20)
-        }.background(Color.kxBackground.ignoresSafeArea()).navigationBarHidden(true).sheet(isPresented: $showAdd) { CalendarPlanEditor() }
-    }
-}
-
-struct CalendarCell: View {
-    let day: Date; let plan: CalendarPlan?; let shift: Shift?
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(day.formatted(.dateTime.day())).font(.caption.bold())
-            if let plan { Text(String(format: "%d:%02d", plan.startMinutes/60, plan.startMinutes%60)).font(.caption2).foregroundStyle(Color.kxGreen); Text("\(plan.plannedRings)K").font(.caption2.bold()) }
-            else if let shift { Text(shift.startedAt?.formatted(date: .omitted, time: .shortened) ?? "Смена").font(.caption2).foregroundStyle(.secondary); if shift.plannedRings > 0 { Text("\(shift.plannedRings)K").font(.caption2.bold()) } }
-            Spacer(minLength: 0)
-        }.padding(6).frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
-            .background((plan != nil || shift != nil) ? Color.kxGreen.opacity(0.14) : Color.kxSurface2.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Calendar.current.isDateInToday(day) ? Color.kxGreen : Color.white.opacity(0.05), lineWidth: Calendar.current.isDateInToday(day) ? 2 : 1))
-    }
-}
-
-// MARK: - STATS
-struct StatsView: View {
-    @Query private var shifts: [Shift]
-    @Query private var routes: [Route]
-    @Query private var finances: [FinancialEntry]
-    @State private var period: Period = .month
-    enum Period: String, CaseIterable, Identifiable { case day="День", week="Неделя", month="Месяц", year="Год", all="Всё"; var id:String{rawValue} }
-    private var start: Date? { let c=Calendar.current; switch period { case .day:return c.startOfDay(for:.now); case .week:return c.dateInterval(of:.weekOfYear,for:.now)?.start; case .month:return c.dateInterval(of:.month,for:.now)?.start; case .year:return c.dateInterval(of:.year,for:.now)?.start; case .all:return nil } }
-    private var filteredRoutes:[Route] { routes.filter { $0.deletedAt == nil && (start == nil || $0.date >= start!) } }
-    private var filteredShifts:[Shift] { shifts.filter { $0.deletedAt == nil && (start == nil || $0.date >= start!) } }
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                KXHeader(title:"Статистика", subtitle:"Заказы, чаевые и смены")
-                Picker("Период", selection:$period){ ForEach(Period.allCases){Text($0.rawValue).tag($0)} }.pickerStyle(.segmented)
-                let orders = filteredRoutes.reduce(0){$0+$1.factualOrders}; let tips = filteredRoutes.reduce(Int64(0)){$0+$1.tipsHellers}; let gross=filteredRoutes.reduce(Int64(0)){$0+$1.grossHellers}
-                HStack(spacing:10){ KXMetric(title:"Заказы",value:"\(orders)",icon:"shippingbox"); KXMetric(title:"Чаевые",value:moneyKc(tips),icon:"banknote") }
-                HStack(spacing:10){ KXMetric(title:"Смены",value:"\(filteredShifts.count)",icon:"clock"); KXMetric(title:"Заработок",value:moneyKc(gross+tips),icon:"chart.line.uptrend.xyaxis") }
-                KXCard(content: VStack(alignment:.leading,spacing:10){ Text("Заказы по дням").font(.headline); Chart(filteredRoutes){ r in BarMark(x:.value("День",r.date,unit:.day),y:.value("Заказы",r.factualOrders)).foregroundStyle(Color.kxGreen.gradient) }.frame(height:220) })
-                if let best = filteredRoutes.max(by: {$0.factualOrders < $1.factualOrders}) { KXCard(content: VStack(alignment:.leading){ Text("Лучший день").font(.caption).foregroundStyle(.secondary); Text(best.date.formatted(date:.abbreviated,time:.omitted)).font(.headline); Text("\(best.factualOrders) заказов · \(moneyKc(best.tipsHellers)) чаевых").foregroundStyle(.secondary) }) }
-            }.padding(16).padding(.bottom,24)
-        }.background(Color.kxBackground.ignoresSafeArea()).navigationBarHidden(true)
-    }
-}
-
-// MARK: - SCANNER
-struct ScannerView: View {
-    @Environment(\.modelContext) private var context
-    @Query(sort: \Shift.date, order: .reverse) private var shifts:[Shift]
-    @State private var item: PhotosPickerItem?; @State private var image: UIImage?; @State private var text=""; @State private var busy=false; @State private var showRoute=false
-    var body: some View {
-        ScrollView { VStack(spacing:14) {
-            KXHeader(title:"Сканер", subtitle:"OCR заказников, статистики и финансов")
-            KXCard(content: VStack(spacing:12){
-                if let image { Image(uiImage:image).resizable().scaledToFit().frame(maxHeight:260).clipShape(RoundedRectangle(cornerRadius:14)) }
-                PhotosPicker(selection:$item, matching:.images) { Label(image == nil ? "Выбрать фото" : "Выбрать другое фото", systemImage:"photo").frame(maxWidth:.infinity) }.buttonStyle(.borderedProminent).tint(Color.kxGreen)
-                if busy { ProgressView("Распознавание…") }
-                if !text.isEmpty {
-                    DisclosureGroup("Исходный OCR") { TextEditor(text:$text).frame(minHeight:150).font(.system(.caption,design:.monospaced)).scrollContentBackground(.hidden) }
-                    Button("Создать трассу из результата") { showRoute=true }.buttonStyle(.borderedProminent).tint(Color.kxGreen)
                 }
-            })
-            Text("OCR-блок по умолчанию свернут. Перед сохранением можно проверить и исправить распознанный текст.").font(.caption).foregroundStyle(.secondary)
-        }.padding(16) }.background(Color.kxBackground.ignoresSafeArea()).navigationBarHidden(true)
-        .onChange(of:item){ _,new in guard let new else{return}; Task { busy=true; defer{busy=false}; if let data=try? await new.loadTransferable(type:Data.self), let ui=UIImage(data:data){ image=ui; text=(try? await OCRService.recognize(ui)) ?? "" } } }
-        .sheet(isPresented:$showRoute){ RouteEditorView(ocrText:text, shift:shifts.first{$0.deletedAt==nil && $0.status == .active}) }
+                HStack(spacing: 12) {
+                    PhotosPicker(selection: $pickerItem, matching: .images) { Text("Камера / Фото").frame(maxWidth:.infinity) }.buttonStyle(.bordered).controlSize(.large)
+                    Button("Импорт скриншота") { showImport = true }.buttonStyle(.borderedProminent).tint(Color.kxGreen).controlSize(.large).frame(maxWidth:.infinity)
+                }
+                Text("После OCR график сначала открывается на проверку найденных рабочих дней.").font(.footnote).foregroundStyle(.secondary).frame(maxWidth:.infinity, alignment:.leading)
+                KXCard { VStack(alignment:.leading,spacing:7) { Text("Цвета плана").font(.headline); Text("Liboc: 6:00 зелёный · 6:30 красный · 7:30 фиолетовый").foregroundStyle(.secondary) } }
+            }.padding(.horizontal,18).padding(.bottom,22)
+        }
+        .background(Color.kxBackground.ignoresSafeArea()).navigationBarHidden(true)
+        .onChange(of: pickerItem) { _, item in Task { guard let data = try? await item?.loadTransferable(type: Data.self), let image = UIImage(data:data), let text = try? await OCRService.recognize(image) else { return }; ocrText=text; showImport=true } }
+        .sheet(isPresented:$showImport) { CalendarImportSheet(ocrText: ocrText) }
     }
 }
 
-// MARK: - MORE
-struct MoreView: View {
+struct CalendarDayCell: View {
+    let day: Date; let plan: CalendarPlan?
     var body: some View {
-        ScrollView { VStack(spacing: 10) {
-            KXHeader(title:"Ещё", subtitle:"Все разделы KurierX")
-            KXCard(content: VStack(spacing:0){
-                moreLink("Клиенты","По дням, трассам и чаевым","person.2", CustomersView())
-                Divider(); moreLink("Смены","История и редактирование","clock", ShiftsView())
-                Divider(); moreLink("Зарплата","Помесячная диаграмма","chart.bar", SalaryView())
-                Divider(); moreLink("Бонусы и штрафы","Финансовые операции и OCR","banknote", FinancialView())
-                Divider(); moreLink("Дизель","Расходы на топливо","fuelpump", FuelView())
-                Divider(); moreLink("Авансы","Полученные авансы","creditcard", AdvancesView())
-                Divider(); moreLink("Цели","Заказы и заработок","target", GoalsView())
-                Divider(); moreLink("Резервные копии","Экспорт локальных данных","externaldrive", BackupView())
-                Divider(); moreLink("Журнал","История действий","list.bullet.rectangle", AuditView())
-                Divider(); moreLink("Корзина","Удалённые данные","trash", TrashView())
-                Divider(); moreLink("Расширенный режим","Служебные функции","lock.shield", DeveloperView())
-                Divider(); moreLink("Настройки","Склад, адрес и аккаунт","gearshape", SettingsView())
-            })
-        }.padding(16).padding(.bottom,25) }.background(Color.kxBackground.ignoresSafeArea()).navigationBarHidden(true)
+        VStack(alignment:.leading,spacing:3) {
+            Text(day.formatted(.dateTime.day())).font(.system(size:16,weight:.semibold))
+            if let plan { Text(String(format:"%02d:%02d",plan.startMinutes/60,plan.startMinutes%60)).font(.caption2).foregroundStyle(Color.kxGreen); Text("\(plan.plannedRings)K").font(.caption2.bold()) }
+            Spacer()
+        }.padding(8).frame(maxWidth:.infinity,minHeight:83,alignment:.topLeading)
+            .background(Color.kxSurface2,in:RoundedRectangle(cornerRadius:11)).overlay(RoundedRectangle(cornerRadius:11).stroke(Calendar.current.isDateInToday(day) ? Color.kxGreen : Color.white.opacity(0.06),lineWidth: Calendar.current.isDateInToday(day) ? 2 : 1))
     }
-    private func moreLink<D:View>(_ title:String,_ subtitle:String,_ icon:String,_ destination:D)->some View { NavigationLink(destination:destination){KXRow(title:title,subtitle:subtitle,icon:icon)}.buttonStyle(.plain) }
 }
 
+struct CalendarImportSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    let ocrText: String
+    @State private var date = Date.now; @State private var warehouse = Warehouse.liboc; @State private var hour = 6; @State private var minute = 0; @State private var rings = 4
+    var body: some View {
+        NavigationStack { Form { DatePicker("День",selection:$date,displayedComponents:.date); Picker("Склад",selection:$warehouse){ForEach(Warehouse.allCases){Text($0.rawValue).tag($0)}}; Stepper("Время: \(String(format:"%02d:%02d",hour,minute))",value:$hour,in:0...23); Stepper("Минуты: \(minute)",value:$minute,in:0...59,step:5); Stepper("Колечек: \(rings)",value:$rings,in:1...20); if !ocrText.isEmpty { Section("Распознано") { Text(ocrText).font(.caption).lineLimit(8) } } }
+            .navigationTitle("Проверка импорта").toolbar { ToolbarItem(placement:.cancellationAction){Button("Отмена"){dismiss()}};ToolbarItem(placement:.confirmationAction){Button("Сохранить"){context.insert(CalendarPlan(date:date,warehouse:warehouse,startMinutes:hour*60+minute,plannedRings:rings));try? context.save();dismiss()}} } }
+    }
+}

@@ -8,6 +8,7 @@ import UIKit
 @MainActor final class SessionStore: ObservableObject {
     @Published var state: State = .loading
     @Published var profile: UserProfile?
+    @Published var isOwner = false
     enum State: Equatable { case loading, needsFirebase, registration, active, frozen, revoked, owner }
 
     private var listener: ListenerRegistration?
@@ -17,7 +18,9 @@ import UIKit
 
     func bootstrap() async {
         guard FirebaseApp.app() != nil else { state = .needsFirebase; return }
-        if let current = Auth.auth().currentUser, current.uid == ownerUID { state = .owner; return }
+        if let user = Auth.auth().currentUser, user.uid == ownerUID {
+            isOwner = true; state = .owner; return
+        }
         if Auth.auth().currentUser == nil {
             do { _ = try await Auth.auth().signInAnonymously() }
             catch { state = .registration; return }
@@ -31,9 +34,9 @@ import UIKit
         listener = Firestore.firestore().collection("users").document(uid).addSnapshotListener { [weak self] snap, _ in
             guard let self else { return }
             Task { @MainActor in
-                guard let data = snap?.data() else { self.state = .registration; self.profile = nil; return }
+                guard let data = snap?.data() else { self.profile = nil; self.isOwner = false; self.state = .registration; return }
                 self.profile = UserProfile(data: data)
-                switch (data["status"] as? String ?? "") {
+                switch data["status"] as? String ?? "" {
                 case "ACTIVE": self.state = .active
                 case "FROZEN": self.state = .frozen
                 default: self.state = .revoked
@@ -46,7 +49,7 @@ import UIKit
         if Auth.auth().currentUser == nil { _ = try await Auth.auth().signInAnonymously() }
         guard let uid = Auth.auth().currentUser?.uid else { throw LicenseError.noUser }
         let normalized = key.uppercased().filter { $0.isLetter || $0.isNumber }
-        guard normalized.hasPrefix("KX"), normalized.count >= 14 else { throw LicenseError.badFormat }
+        guard normalized.hasPrefix("KX"), normalized.count == 14 else { throw LicenseError.badFormat }
         let hash = SHA256.hash(data: Data(normalized.utf8)).map { String(format: "%02x", $0) }.joined()
         let db = Firestore.firestore(); let keyRef = db.collection("activation_keys").document(hash)
         let deviceID = Self.deviceID(); let userRef = db.collection("users").document(uid); let deviceRef = db.collection("devices").document(deviceID)
@@ -56,8 +59,20 @@ import UIKit
                 guard keyDoc.exists, keyDoc.data()?["status"] as? String == "UNUSED" else { throw LicenseError.invalidKey }
                 let now = FieldValue.serverTimestamp()
                 tx.updateData(["status":"USED", "userId":uid, "deviceId":deviceID, "activatedAt":now], forDocument:keyRef)
-                tx.setData(["uid":uid,"firstName":firstName,"lastName":lastName,"courierId":courierID,"deviceId":deviceID,"activationKeyId":hash,"status":"ACTIVE","role":"USER","createdAt":now,"updatedAt":now], forDocument:userRef)
-                tx.setData(["uid":uid,"deviceId":deviceID,"platform":"IOS","manufacturer":"Apple","model":UIDevice.current.model,"systemVersion":"iOS \(UIDevice.current.systemVersion)","appVersion":Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0","status":"ACTIVE","createdAt":now,"lastSeenAt":now], forDocument:deviceRef)
+                tx.setData([
+                    "uid":uid,"firstName":firstName,"lastName":lastName,"courierId":courierID,
+                    "deviceId":deviceID,"activationKeyId":hash,"status":"ACTIVE","role":"USER",
+                    "createdAt":now,"updatedAt":now
+                ], forDocument:userRef)
+                // Compatibility with the current Android Firestore rule set: it expects the field
+                // name androidVersion and platform ANDROID. Manufacturer/model still identify iPhone.
+                // This avoids requiring a Firebase-console change just to activate the iOS client.
+                tx.setData([
+                    "uid":uid,"deviceId":deviceID,"platform":"ANDROID","manufacturer":"Apple",
+                    "model":UIDevice.current.model,"androidVersion":"iOS \(UIDevice.current.systemVersion)",
+                    "appVersion":Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
+                    "status":"ACTIVE","createdAt":now,"lastSeenAt":now
+                ], forDocument:deviceRef)
                 return nil
             } catch { errorPointer?.pointee = error as NSError; return nil }
         }
@@ -68,17 +83,17 @@ import UIKit
         listener?.remove(); try? Auth.auth().signOut()
         let result = try await Auth.auth().signIn(withEmail: email, password: password)
         guard result.user.uid == ownerUID else { try? Auth.auth().signOut(); throw LicenseError.notOwner }
-        state = .owner
+        isOwner = true; state = .owner
     }
 
-    func leaveOwnerMode() async {
-        listener?.remove(); try? Auth.auth().signOut(); profile = nil
-        do { _ = try await Auth.auth().signInAnonymously(); state = .registration }
-        catch { state = .registration }
+    func leaveOwnerToActivation() async {
+        listener?.remove(); try? Auth.auth().signOut(); profile = nil; isOwner = false
+        do { _ = try await Auth.auth().signInAnonymously() } catch { }
+        state = .registration
     }
 
     func signOutUser() async {
-        listener?.remove(); try? Auth.auth().signOut(); profile = nil
+        listener?.remove(); try? Auth.auth().signOut(); profile = nil; isOwner = false
         do { _ = try await Auth.auth().signInAnonymously() } catch { }
         state = .registration
     }
@@ -90,18 +105,21 @@ import UIKit
 }
 
 struct UserProfile {
-    let firstName:String; let lastName:String; let courierID:String
-    init(data:[String:Any]) { firstName=data["firstName"] as? String ?? ""; lastName=data["lastName"] as? String ?? ""; courierID=data["courierId"] as? String ?? "" }
+    let firstName: String; let lastName: String; let courierID: String; let status: String
+    init(data: [String:Any]) {
+        firstName = data["firstName"] as? String ?? ""; lastName = data["lastName"] as? String ?? ""
+        courierID = data["courierId"] as? String ?? ""; status = data["status"] as? String ?? ""
+    }
 }
 
 enum LicenseError: LocalizedError {
-    case noUser,badFormat,invalidKey,notOwner
-    var errorDescription:String? {
+    case noUser, badFormat, invalidKey, notOwner
+    var errorDescription: String? {
         switch self {
-        case .noUser:return "Нет Firebase-сессии"
-        case .badFormat:return "Ключ неверного формата"
-        case .invalidKey:return "Ключ недействителен или уже использован"
-        case .notOwner:return "Нет OWNER-доступа"
+        case .noUser: return "Нет Firebase-сессии"
+        case .badFormat: return "Ключ неверного формата"
+        case .invalidKey: return "Ключ недействителен или уже использован"
+        case .notOwner: return "Нет OWNER-доступа"
         }
     }
 }

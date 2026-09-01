@@ -11,7 +11,16 @@ workflows:
       - name: Generate Xcode project
         script: xcodegen generate
       - name: Resolve Swift packages
-        script: xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX
+        script: |
+          set -e
+          for attempt in 1 2 3; do
+            if xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX; then
+              exit 0
+            fi
+            echo "Swift package resolve failed (attempt $attempt/3); retrying in 15s..."
+            sleep 15
+          done
+          exit 1
       - name: Build for iOS Simulator
         script: |
           set -o pipefail
@@ -31,7 +40,16 @@ workflows:
       - name: Generate Xcode project
         script: xcodegen generate
       - name: Resolve Swift packages
-        script: xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX
+        script: |
+          set -e
+          for attempt in 1 2 3; do
+            if xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX; then
+              exit 0
+            fi
+            echo "Swift package resolve failed (attempt $attempt/3); retrying in 15s..."
+            sleep 15
+          done
+          exit 1
       - name: Build for physical iPhone without signing
         script: |
           set -euo pipefail

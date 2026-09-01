@@ -3,9 +3,10 @@ import UIKit
 
 extension Color {
     static let kxGreen = Color(red: 0.55, green: 0.77, blue: 0.29)
-    static let kxBackground = Color(red: 0.055, green: 0.065, blue: 0.075)
-    static let kxSurface = Color(red: 0.095, green: 0.105, blue: 0.12)
-    static let kxSurface2 = Color(red: 0.13, green: 0.14, blue: 0.16)
+    static let kxBackground = Color(red: 0.045, green: 0.052, blue: 0.058)
+    static let kxSurface = Color(red: 0.095, green: 0.092, blue: 0.105)
+    static let kxSurface2 = Color(red: 0.12, green: 0.12, blue: 0.135)
+    static let kxPurple = Color(red: 0.30, green: 0.22, blue: 0.52)
 }
 
 struct KXCard<Content: View>: View {
@@ -13,9 +14,11 @@ struct KXCard<Content: View>: View {
     init(content: Content) { self.content = content }
     init(@ViewBuilder _ content: () -> Content) { self.content = content() }
     var body: some View {
-        content.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.kxSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        content
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.kxSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.055), lineWidth: 1))
     }
 }
 
@@ -23,36 +26,45 @@ struct KXHeader: View {
     let title: String
     var subtitle: String? = nil
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.system(size: 30, weight: .black, design: .rounded))
-            if let subtitle { Text(subtitle).font(.subheadline).foregroundStyle(.secondary) }
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(.system(size: 31, weight: .black, design: .rounded))
+            if let subtitle { Text(subtitle).font(.system(size: 17)).foregroundStyle(.secondary) }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-struct KXMetric: View {
-    let title: String; let value: String; let icon: String
+struct KXSectionRow: View {
+    let title: String; let subtitle: String; let icon: String
     var body: some View {
-        KXCard(content: HStack(spacing: 12) {
-            Image(systemName: icon).font(.title2).foregroundStyle(Color.kxGreen)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.caption).foregroundStyle(.secondary)
-                Text(value).font(.title3.bold())
+        HStack(spacing: 13) {
+            ZStack {
+                Circle().fill(Color.kxGreen.opacity(0.10))
+                Image(systemName: icon).font(.system(size: 23, weight: .semibold)).foregroundStyle(Color.kxGreen)
+            }.frame(width: 48, height: 48)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.system(size: 17, weight: .semibold))
+                Text(subtitle).font(.system(size: 14)).foregroundStyle(.secondary).lineLimit(2)
             }
-            Spacer()
-        })
+            Spacer(); Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(Color.kxSurface2, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
-struct KXRow: View {
-    let title: String; let subtitle: String; let icon: String
-    var tint: Color = .kxGreen
+struct KXBrand: View {
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack { RoundedRectangle(cornerRadius: 12).fill(tint.opacity(0.16)); Image(systemName: icon).foregroundStyle(tint) }.frame(width: 42, height: 42)
-            VStack(alignment: .leading, spacing: 3) { Text(title).font(.headline); Text(subtitle).font(.caption).foregroundStyle(.secondary) }
-            Spacer(); Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.tertiary)
-        }.padding(.vertical, 5)
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.45))
+                Image(systemName: "paperplane.fill").rotationEffect(.degrees(-35)).foregroundStyle(Color.kxGreen).font(.title2)
+            }.frame(width: 54, height: 54)
+            HStack(spacing: 0) {
+                Text("Kurier").font(.system(size: 31, weight: .black, design: .rounded))
+                Text("X").font(.system(size: 31, weight: .black, design: .rounded)).foregroundStyle(Color.kxGreen)
+            }
+            Spacer()
+        }
     }
 }
 
@@ -61,5 +73,11 @@ struct KeyboardDoneToolbar: ToolbarContent {
         ToolbarItemGroup(placement: .keyboard) {
             Spacer(); Button("Готово") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
         }
+    }
+}
+
+extension View {
+    func kxDismissKeyboardOnTap() -> some View {
+        self.contentShape(Rectangle()).onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
     }
 }

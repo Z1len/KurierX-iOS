@@ -1,45 +1,48 @@
 import Foundation
 import SwiftData
 
-enum Warehouse: String, Codable, CaseIterable, Identifiable {
+enum Warehouse: String, Codable, CaseIterable, Identifiable, Equatable {
     case liboc = "Liboc"
     case chrastany = "Chrášťany"
     case horniPocernice = "Horní Počernice"
     var id: String { rawValue }
 }
 
-enum RouteType: String, Codable, CaseIterable, Identifiable {
+enum RouteType: String, Codable, CaseIterable, Identifiable, Equatable {
     case ot = "OT"
-    case region = "REG"
-    case express = "EXP"
+    case region = "Region"
+    case express = "Express"
     var id: String { rawValue }
-    var rings: Int { switch self { case .ot: 1; case .region: 1; case .express: 1 } }
+    var rings: Int { 1 }
 }
 
-enum ShiftStatus: String, Codable, CaseIterable { case planned, active, complete, partial }
-enum FinancialKind: String, Codable, CaseIterable, Identifiable {
+enum ShiftStatus: String, Codable, CaseIterable, Equatable { case planned, active, complete, partial }
+
+enum FinancialKind: String, Codable, CaseIterable, Identifiable, Equatable {
     case bonus = "Бонус"
+    case compensation = "Компенсация"
     case penalty = "Штраф"
     var id: String { rawValue }
+    var positive: Bool { self != .penalty }
 }
 
-enum AuditKind: String, Codable { case create, edit, delete, restore, importData, security }
+enum AuditKind: String, Codable { case create, edit, delete, restore, importData, security, backup }
 
 @Model final class Shift {
     @Attribute(.unique) var id: UUID
     var date: Date
     var warehouseRaw: String
     var statusRaw: String
-    var plannedRings: Int = 0
+    var plannedRings: Int
     var startedAt: Date?
     var endedAt: Date?
     var morningOdometer: Double?
     var queueOdometer: Double?
     var closingOdometer: Double?
-    var note: String = ""
+    var note: String
     var deletedAt: Date?
 
-    init(date: Date = Date.now, warehouse: Warehouse = .liboc, status: ShiftStatus = .planned, plannedRings: Int = 0) {
+    init(date: Date = Date.now, warehouse: Warehouse = .liboc, status: ShiftStatus = .planned, plannedRings: Int = 4) {
         id = UUID(); self.date = date; warehouseRaw = warehouse.rawValue; statusRaw = status.rawValue
         self.plannedRings = plannedRings; note = ""
     }
@@ -54,21 +57,21 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
 @Model final class Route {
     @Attribute(.unique) var id: UUID
     var shiftID: UUID
-    var date: Date = Date.now
+    var date: Date
     var sequence: Int
     var typeRaw: String
-    var warehouseRaw: String = Warehouse.liboc.rawValue
+    var warehouseRaw: String
     var plannedOrders: Int
     var factualOrders: Int
     var tipsHellers: Int64
     var distanceKm: Double?
-    var grossHellers: Int64 = 0
-    var note: String = ""
+    var grossHellers: Int64
+    var note: String
     var deletedAt: Date?
 
-    init(shiftID: UUID, date: Date = Date.now, sequence: Int, type: RouteType, warehouse: Warehouse = .liboc, plannedOrders: Int = 0, factualOrders: Int = 0, tipsHellers: Int64 = 0) {
+    init(shiftID: UUID, date: Date = Date.now, sequence: Int, type: RouteType, warehouse: Warehouse = .liboc, plannedOrders: Int = 0, factualOrders: Int = 0, tipsHellers: Int64 = 0, distanceKm: Double? = nil, grossHellers: Int64 = 0) {
         id = UUID(); self.shiftID = shiftID; self.date = date; self.sequence = sequence; typeRaw = type.rawValue; warehouseRaw = warehouse.rawValue
-        self.plannedOrders = plannedOrders; self.factualOrders = factualOrders; self.tipsHellers = tipsHellers; grossHellers = 0; note = ""
+        self.plannedOrders = plannedOrders; self.factualOrders = factualOrders; self.tipsHellers = tipsHellers; self.distanceKm = distanceKm; self.grossHellers = grossHellers; note = ""
     }
     var type: RouteType { get { RouteType(rawValue: typeRaw) ?? .ot } set { typeRaw = newValue.rawValue } }
     var warehouse: Warehouse { get { Warehouse(rawValue: warehouseRaw) ?? .liboc } set { warehouseRaw = newValue.rawValue } }
@@ -77,15 +80,15 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
 @Model final class Customer {
     @Attribute(.unique) var id: UUID
     var routeID: UUID
-    var date: Date = Date.now
-    var routeSequence: Int = 1
-    var routeTypeRaw: String = RouteType.ot.rawValue
+    var date: Date
+    var routeSequence: Int
+    var routeTypeRaw: String
     var firstName: String
     var lastName: String
     var address: String
     var bags: Int
     var tipsHellers: Int64
-    var note: String = ""
+    var note: String
     var deletedAt: Date?
 
     init(routeID: UUID, date: Date = Date.now, routeSequence: Int = 1, routeType: RouteType = .ot, firstName: String, lastName: String = "", address: String, bags: Int = 0, tipsHellers: Int64 = 0) {
@@ -100,7 +103,7 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var kindRaw: String
     var amountHellers: Int64
     var note: String
-    var source: String = "Ручной ввод"
+    var source: String
     var deletedAt: Date?
     init(date: Date = Date.now, kind: FinancialKind, amountHellers: Int64, note: String = "", source: String = "Ручной ввод") {
         id = UUID(); self.date = date; kindRaw = kind.rawValue; self.amountHellers = amountHellers; self.note = note; self.source = source
@@ -120,10 +123,12 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var date: Date
     var warehouseRaw: String
     var startMinutes: Int
-    var plannedRings: Int = 0
+    var plannedRings: Int
     var note: String
-    init(date: Date, warehouse: Warehouse, startMinutes: Int, plannedRings: Int) { id = UUID(); self.date = date; warehouseRaw = warehouse.rawValue; self.startMinutes = startMinutes; self.plannedRings = plannedRings; note = "" }
-    var warehouse: Warehouse { Warehouse(rawValue: warehouseRaw) ?? .liboc }
+    init(date: Date, warehouse: Warehouse, startMinutes: Int, plannedRings: Int) {
+        id = UUID(); self.date = date; warehouseRaw = warehouse.rawValue; self.startMinutes = startMinutes; self.plannedRings = plannedRings; note = ""
+    }
+    var warehouse: Warehouse { get { Warehouse(rawValue: warehouseRaw) ?? .liboc } set { warehouseRaw = newValue.rawValue } }
 }
 
 @Model final class FuelEntry {
@@ -134,7 +139,9 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var distanceKm: Double
     var note: String
     var deletedAt: Date?
-    init(date: Date = Date.now, amountHellers: Int64 = 0, liters: Double = 0, distanceKm: Double = 0, note: String = "") { id = UUID(); self.date = date; self.amountHellers = amountHellers; self.liters = liters; self.distanceKm = distanceKm; self.note = note }
+    init(date: Date = Date.now, amountHellers: Int64 = 0, liters: Double = 0, distanceKm: Double = 0, note: String = "") {
+        id = UUID(); self.date = date; self.amountHellers = amountHellers; self.liters = liters; self.distanceKm = distanceKm; self.note = note
+    }
 }
 
 @Model final class AdvanceEntry {
@@ -144,6 +151,15 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
     var note: String
     var deletedAt: Date?
     init(date: Date = Date.now, amountHellers: Int64 = 0, note: String = "") { id = UUID(); self.date = date; self.amountHellers = amountHellers; self.note = note }
+}
+
+@Model final class SalaryEntry {
+    @Attribute(.unique) var id: UUID
+    var month: String
+    var paidHellers: Int64
+    var note: String
+    var paidAt: Date
+    init(month: String, paidHellers: Int64, note: String = "", paidAt: Date = Date.now) { id = UUID(); self.month = month; self.paidHellers = paidHellers; self.note = note; self.paidAt = paidAt }
 }
 
 @Model final class AuditEntry {
@@ -162,14 +178,21 @@ enum AuditKind: String, Codable { case create, edit, delete, restore, importData
 }
 
 func moneyKc(_ hellers: Int64) -> String {
-    let value = Double(hellers) / 100.0
-    return value.formatted(.currency(code: "CZK").locale(Locale(identifier: "cs_CZ")))
+    let number = Double(hellers) / 100.0
+    let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "CZK"; f.locale = Locale(identifier: "cs_CZ"); f.maximumFractionDigits = 0
+    return f.string(from: NSNumber(value: number)) ?? "\(Int(number)) Kč"
+}
+
+func minutesLabel(_ minutes: Int) -> String {
+    let h = max(0, minutes) / 60; let m = max(0, minutes) % 60
+    return h > 0 ? "\(h) ч \(m) мин" : "\(m) мин"
 }
 
 extension Date {
-    var dayKey: String { formatted(.dateTime.year().month().day()) }
     var monthKey: String {
         let c = Calendar.current.dateComponents([.year, .month], from: self)
         return String(format: "%04d-%02d", c.year ?? 0, c.month ?? 0)
     }
+    var startOfDay: Date { Calendar.current.startOfDay(for: self) }
+    func sameDay(as other: Date) -> Bool { Calendar.current.isDate(self, inSameDayAs: other) }
 }

@@ -13,18 +13,20 @@ targets:
   KurierX:
     type: application
     platform: iOS
-    # IMPORTANT: only the final monolithic Swift source is compiled.
-    # Old Swift files may remain in the repository without causing duplicate declarations.
+
+    # Compile only the final monolithic Swift source.
+    # Add Firebase configuration explicitly to Copy Bundle Resources.
     sources:
       - path: KurierX/KurierXFinalApp.swift
-    resources:
       - path: KurierX/Resources/GoogleService-Info.plist
+        buildPhase: resources
+
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.courierledger.ios
         PRODUCT_NAME: KurierX
-        MARKETING_VERSION: 4.0.0
-        CURRENT_PROJECT_VERSION: 7
+        MARKETING_VERSION: 4.0.1
+        CURRENT_PROJECT_VERSION: 8
         SWIFT_VERSION: 5.9
         TARGETED_DEVICE_FAMILY: '1'
         GENERATE_INFOPLIST_FILE: YES
@@ -36,6 +38,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+
     dependencies:
       - package: Firebase
         product: FirebaseCore

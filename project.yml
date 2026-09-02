@@ -3,31 +3,35 @@ options:
   bundleIdPrefix: cz.courierledger
   deploymentTarget:
     iOS: '17.0'
+
 packages:
   Firebase:
     url: https://github.com/firebase/firebase-ios-sdk.git
     from: 12.0.0
+
 targets:
   KurierX:
     type: application
     platform: iOS
+    # IMPORTANT: only the final monolithic Swift source is compiled.
+    # Old Swift files may remain in the repository without causing duplicate declarations.
     sources:
-      - path: KurierX
+      - path: KurierX/KurierXFinalApp.swift
     resources:
       - path: KurierX/Resources/GoogleService-Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.courierledger.ios
         PRODUCT_NAME: KurierX
-        MARKETING_VERSION: 3.1.0
-        CURRENT_PROJECT_VERSION: 6
-        SWIFT_VERSION: 5.0
+        MARKETING_VERSION: 4.0.0
+        CURRENT_PROJECT_VERSION: 7
+        SWIFT_VERSION: 5.9
         TARGETED_DEVICE_FAMILY: '1'
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: KurierX
-        INFOPLIST_KEY_NSCameraUsageDescription: KurierX uses the camera to scan courier screens and orders.
-        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: KurierX uses selected photos for OCR import.
-        INFOPLIST_KEY_NSFaceIDUsageDescription: Face ID is used to unlock Developer Mode.
+        INFOPLIST_KEY_NSCameraUsageDescription: KurierX использует камеру для OCR графика, трасс, заказников, бонусов и штрафов.
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: KurierX использует выбранные фотографии для OCR-импорта.
+        INFOPLIST_KEY_NSFaceIDUsageDescription: KurierX использует Face ID для разблокировки Developer Mode.
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES

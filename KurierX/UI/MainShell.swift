@@ -1,9 +1,331 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
-struct MainShell:View{let isOwner:Bool;@State private var tab = Tab.home;enum Tab:CaseIterable,Hashable{case home,calendar,stats,scanner,more};var body:some View{ZStack(alignment:.bottom){Group{switch tab{case .home:NavigationStack{HomeView(openScanner:{tab = .scanner})};case .calendar:NavigationStack{CalendarViewKX()};case .stats:NavigationStack{StatsView()};case .scanner:NavigationStack{ScannerView()};case .more:NavigationStack{MoreView(isOwner:isOwner)}}}.padding(.bottom,76);BottomBar(tab:$tab)}.background(Color.kxBackground.ignoresSafeArea()).ignoresSafeArea(.keyboard,edges:.bottom)}}
-struct BottomBar:View{@Binding var tab:MainShell.Tab;let data:[(MainShell.Tab,String,String)] = [(.home,"Главная","house"),(.calendar,"Календарь","calendar"),(.stats,"Статистика","chart.bar.fill"),(.scanner,"Сканер","qrcode.viewfinder"),(.more,"Ещё","ellipsis")];var body:some View{HStack{ForEach(data,id:\.0){x in Button{tab = x.0}label:{VStack{Image(systemName:x.2).font(.title2);Text(x.1).font(.caption2)}.frame(maxWidth:.infinity).foregroundStyle(tab==x.0 ? Color.kxGreen:.secondary)}}}.padding(.vertical,9).background(Color.kxSurface2)}}
-struct HomeView:View{@Environment(\.modelContext)var ctx;@Query(sort:\Shift.date,order:.reverse)var shifts:[Shift];@Query(sort:\Route.date,order:.reverse)var routes:[Route];let openScanner:()->Void;@State private var start = false,close = false,selectedRoute:Route?;var active:Shift?{shifts.first{$0.deletedAt==nil && $0.status == .active}};var body:some View{ScrollView{VStack(spacing:16){Text("KurierX").font(.system(size:36,weight:.black)).frame(maxWidth:.infinity,alignment:.leading);KXCard{VStack(alignment:.leading){Text("Заработок по обработанным трассам");Text(moneyKc(routes.filter{$0.deletedAt==nil}.reduce(0){$0+EarningsService.routeGross($1)})).font(.largeTitle.bold());Text("Итог рассчитывается приложением автоматически.").foregroundStyle(.secondary)}};if let s = active{KXCard{VStack(alignment:.leading,spacing:12){Text("Смена активна").font(.title2.bold());Text("План: \(s.plannedRings) колечка");Button("Добавить закрытую трассу",action:openScanner).buttonStyle(.borderedProminent).tint(Color.kxGreen);Button("Закрыть текущую смену"){close = true}.buttonStyle(.bordered)}}}else{Button("Начать смену"){start = true}.buttonStyle(.borderedProminent).tint(Color.kxGreen).controlSize(.large)};if let s = active{let rs = routes.filter{$0.shiftID==s.id && $0.deletedAt==nil};if !rs.isEmpty{Text("Закрытые трассы").font(.title2.bold()).frame(maxWidth:.infinity,alignment:.leading);ForEach(rs){r in Button{selectedRoute = r}label:{KXCard{HStack{VStack(alignment:.leading){Text("\(r.type.rawValue) · трасса #\(r.sequence)").bold();Text("\(r.factualOrders) заказов" ).foregroundStyle(.secondary)};Spacer();Text(moneyKc(EarningsService.routeGross(r))).bold()}}}.buttonStyle(.plain)}}}}.padding(18)}.sheet(isPresented:$start){ShiftEditor()}.sheet(item:$selectedRoute){RouteEditor(route:$0,developer:false)}.sheet(isPresented:$close){if let s = active{CloseShiftSheet(shift:s)}}}}
-struct ShiftEditor:View{@Environment(\.dismiss)var dismiss;@Environment(\.modelContext)var ctx;@State var wh = Warehouse.liboc;@State var plan = 4;@State var odo = "";var body:some View{NavigationStack{Form{Picker("Склад",selection:$wh){ForEach(Warehouse.allCases){Text($0.rawValue).tag($0)}};Stepper("План: \(plan) колечка",value:$plan,in:1...20);TextField("Спидометр при входе",text:$odo).keyboardType(.decimalPad)}.navigationTitle("Начать смену").toolbar{KeyboardDoneToolbar();ToolbarItem(placement:.cancellationAction){Button("Отмена"){dismiss()}};ToolbarItem(placement:.confirmationAction){Button("Начать"){let s = Shift(warehouse:wh,status:.active,plannedRings:plan);s.startedAt = Date.now;s.queueOdometer = Double(odo.replacingOccurrences(of:",",with:"."));ctx.insert(s);try? ctx.save();dismiss()}}}}}}
-struct CloseShiftSheet:View{@Environment(\.dismiss)var dismiss;@Environment(\.modelContext)var ctx;let shift:Shift;@State var reason = "";@State var odo = "";var body:some View{NavigationStack{Form{Section("Причина досрочного закрытия"){TextField("Например: закончились трассы / личная причина",text:$reason)};TextField("Спидометр при закрытии",text:$odo).keyboardType(.decimalPad)}.navigationTitle("Закрыть смену").toolbar{KeyboardDoneToolbar();ToolbarItem(placement:.cancellationAction){Button("Отмена"){dismiss()}};ToolbarItem(placement:.confirmationAction){Button("Закрыть"){shift.endedAt = Date.now;shift.status = reason.isEmpty ? .complete:.partial;shift.closeReason = reason;shift.closingOdometer = Double(odo.replacingOccurrences(of:",",with:"."));try? ctx.save();dismiss()}}}}}}
-struct RouteEditor:View{@Environment(\.dismiss)var dismiss;@Environment(\.modelContext)var ctx;let route:Route;let developer:Bool;@State var orders = "";@State var km = "";var body:some View{NavigationStack{Form{LabeledContent("Тип",value:route.type.rawValue);TextField("Количество заказов",text:$orders).keyboardType(.numberPad).disabled(!developer);TextField("Километраж",text:$km).keyboardType(.decimalPad).disabled(!developer);Section("Расчёт"){LabeledContent("Итог по трассе",value:moneyKc(EarningsService.routeGross(route)));Text("Чаевые и итог не вводятся вручную.").foregroundStyle(.secondary)}}.navigationTitle("Трасса #\(route.sequence)").onAppear{orders = String(route.factualOrders);km = route.distanceKm.map{String($0)} ?? ""}.toolbar{KeyboardDoneToolbar();ToolbarItem(placement:.cancellationAction){Button("Закрыть"){dismiss()}};if developer{ToolbarItem(placement:.confirmationAction){Button("Сохранить"){route.factualOrders = Int(orders) ?? route.factualOrders;route.distanceKm = Double(km.replacingOccurrences(of:",",with:"."));try? ctx.save();dismiss()}}}}}}}
+
+struct MainShell: View {
+    let isOwner: Bool
+    @State private var tab = Tab.home
+
+    enum Tab: CaseIterable, Hashable {
+        case home, calendar, stats, scanner, more
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Group {
+                switch tab {
+                case .home:
+                    NavigationStack { HomeView(openScanner: { tab = .scanner }) }
+                case .calendar:
+                    NavigationStack { CalendarViewKX() }
+                case .stats:
+                    NavigationStack { StatsView() }
+                case .scanner:
+                    NavigationStack { ScannerView() }
+                case .more:
+                    NavigationStack { MoreView(isOwner: isOwner) }
+                }
+            }
+            .padding(.bottom, 76)
+
+            BottomBar(tab: $tab)
+        }
+        .background(Color.kxBackground.ignoresSafeArea())
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+}
+
+struct BottomBar: View {
+    @Binding var tab: MainShell.Tab
+
+    let data: [(MainShell.Tab, String, String)] = [
+        (.home, "Главная", "house"),
+        (.calendar, "Календарь", "calendar"),
+        (.stats, "Статистика", "chart.bar.fill"),
+        (.scanner, "Сканер", "qrcode.viewfinder"),
+        (.more, "Ещё", "ellipsis")
+    ]
+
+    var body: some View {
+        HStack {
+            ForEach(data, id: \.0) { x in
+                Button {
+                    tab = x.0
+                } label: {
+                    VStack {
+                        Image(systemName: x.2).font(.title2)
+                        Text(x.1).font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(tab == x.0 ? Color.kxGreen : .secondary)
+                }
+            }
+        }
+        .padding(.vertical, 9)
+        .background(Color.kxSurface2)
+    }
+}
+
+struct HomeView: View {
+    @Environment(\.modelContext) var ctx
+    @Query(sort: \Shift.date, order: .reverse) var shifts: [Shift]
+    @Query(sort: \Route.date, order: .reverse) var routes: [Route]
+
+    let openScanner: () -> Void
+
+    @State private var start = false
+    @State private var close = false
+    @State private var selectedRoute: Route?
+
+    var active: Shift? {
+        shifts.first { $0.deletedAt == nil && $0.status == .active }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                Text("KurierX")
+                    .font(.system(size: 36, weight: .black))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                KXCard {
+                    VStack(alignment: .leading) {
+                        Text("Заработок по обработанным трассам")
+                        Text(
+                            moneyKc(
+                                routes
+                                    .filter { $0.deletedAt == nil }
+                                    .reduce(0) { $0 + EarningsService.routeGross($1) }
+                            )
+                        )
+                        .font(.largeTitle.bold())
+
+                        Text("Итог рассчитывается приложением автоматически.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let s = active {
+                    KXCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Смена активна").font(.title2.bold())
+                            Text("План: \(s.plannedRings) колечка")
+
+                            Button("Добавить закрытую трассу", action: openScanner)
+                                .buttonStyle(.borderedProminent)
+                                .tint(Color.kxGreen)
+
+                            Button("Закрыть текущую смену") {
+                                close = true
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                } else {
+                    Button("Начать смену") {
+                        start = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.kxGreen)
+                    .controlSize(.large)
+                }
+
+                if let s = active {
+                    let rs = routes.filter { $0.shiftID == s.id && $0.deletedAt == nil }
+
+                    if !rs.isEmpty {
+                        Text("Закрытые трассы")
+                            .font(.title2.bold())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        ForEach(rs) { r in
+                            Button {
+                                selectedRoute = r
+                            } label: {
+                                KXCard {
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text("\(r.type.rawValue) · трасса #\(r.sequence)").bold()
+                                            Text("\(r.factualOrders) заказов")
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        Spacer()
+
+                                        Text(moneyKc(EarningsService.routeGross(r))).bold()
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(18)
+        }
+        .sheet(isPresented: $start) {
+            ShiftEditor()
+        }
+        .sheet(item: $selectedRoute) {
+            RouteEditor(route: $0, developer: false)
+        }
+        .sheet(isPresented: $close) {
+            if let s = active {
+                CloseShiftSheet(shift: s)
+            }
+        }
+    }
+}
+
+struct ShiftEditor: View {
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) var ctx
+
+    @State var wh = Warehouse.liboc
+    @State var plan = 4
+    @State var odo = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("Склад", selection: $wh) {
+                    ForEach(Warehouse.allCases) {
+                        Text($0.rawValue).tag($0)
+                    }
+                }
+
+                Stepper("План: \(plan) колечка", value: $plan, in: 1...20)
+
+                TextField("Спидометр при входе", text: $odo)
+                    .keyboardType(.decimalPad)
+            }
+            .navigationTitle("Начать смену")
+            .toolbar {
+                KeyboardDoneToolbar()
+
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") { dismiss() }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Начать") {
+                        let s = Shift(
+                            warehouse: wh,
+                            status: .active,
+                            plannedRings: plan
+                        )
+                        s.startedAt = Date.now
+                        s.queueOdometer = Double(odo.replacingOccurrences(of: ",", with: "."))
+                        ctx.insert(s)
+                        try? ctx.save()
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct CloseShiftSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) var ctx
+
+    let shift: Shift
+
+    @State var reason = ""
+    @State var odo = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Причина досрочного закрытия") {
+                    TextField(
+                        "Например: закончились трассы / личная причина",
+                        text: $reason
+                    )
+                }
+
+                TextField("Спидометр при закрытии", text: $odo)
+                    .keyboardType(.decimalPad)
+            }
+            .navigationTitle("Закрыть смену")
+            .toolbar {
+                KeyboardDoneToolbar()
+
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") { dismiss() }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Закрыть") {
+                        shift.endedAt = Date.now
+                        shift.status = reason.isEmpty ? .complete : .partial
+                        shift.closeReason = reason
+                        shift.closingOdometer = Double(odo.replacingOccurrences(of: ",", with: "."))
+                        try? ctx.save()
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct RouteEditor: View {
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) var ctx
+
+    let route: Route
+    let developer: Bool
+
+    @State var orders = ""
+    @State var km = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                LabeledContent("Тип", value: route.type.rawValue)
+
+                TextField("Количество заказов", text: $orders)
+                    .keyboardType(.numberPad)
+                    .disabled(!developer)
+
+                TextField("Километраж", text: $km)
+                    .keyboardType(.decimalPad)
+                    .disabled(!developer)
+
+                Section("Расчёт") {
+                    LabeledContent(
+                        "Итог по трассе",
+                        value: moneyKc(EarningsService.routeGross(route))
+                    )
+                    Text("Чаевые и итог не вводятся вручную.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Трасса #\(route.sequence)")
+            .onAppear {
+                orders = String(route.factualOrders)
+                km = route.distanceKm.map { String($0) } ?? ""
+            }
+            .toolbar {
+                KeyboardDoneToolbar()
+
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Закрыть") { dismiss() }
+                }
+
+                if developer {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Сохранить") {
+                            route.factualOrders = Int(orders) ?? route.factualOrders
+                            route.distanceKm = Double(km.replacingOccurrences(of: ",", with: "."))
+                            try? ctx.save()
+                            dismiss()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

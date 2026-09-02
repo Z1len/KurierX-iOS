@@ -1,15 +1,17 @@
 import Foundation
 
 enum EarningsService {
-    static func routeBaseHellers(type: RouteType, orders: Int) -> Int64 {
-        // Mirrors Android-style local calculation structure. Values remain editable by the
-        // route's explicit grossHellers field when imported OCR provides a factual result.
-        let perOrder: Int64
-        switch type { case .ot: perOrder = 4200; case .region: perOrder = 4700; case .express: perOrder = 5200 }
-        return Int64(max(0, orders)) * perOrder
+  static func routeBaseHellers(type: RouteType, orders: Int) -> Int64 {
+    let p: Int64
+    switch type {
+    case .ot: p = 4200
+    case .region: p = 4700
+    case .express: p = 5200
     }
-
-    static func routeGross(_ route: Route) -> Int64 {
-        route.grossHellers != 0 ? route.grossHellers : routeBaseHellers(type: route.type, orders: route.factualOrders)
-    }
+    return Int64(max(0, orders)) * p
+  }
+  static func routeGross(_ route: Route) -> Int64 {
+    routeBaseHellers(type: route.type, orders: route.factualOrders)
+  }
+  static func estimatedTips(_ route: Route) -> Int64 { 0 }
 }

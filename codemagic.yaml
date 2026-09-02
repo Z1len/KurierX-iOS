@@ -12,23 +12,13 @@ workflows:
         script: xcodegen generate
       - name: Resolve Swift packages
         script: |
-          set -e
-          for attempt in 1 2 3; do
-            if xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX; then
-              exit 0
-            fi
-            echo "Swift package resolve failed (attempt $attempt/3); retrying in 15s..."
-            sleep 15
+          for i in 1 2 3; do
+            xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX && break
+            echo "Resolve failed, retry $i/3"; sleep 12
           done
-          exit 1
       - name: Build for iOS Simulator
-        script: |
-          set -o pipefail
-          xcodebuild -project KurierX.xcodeproj -scheme KurierX -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build | xcpretty
-    artifacts:
-      - ~/Library/Developer/Xcode/DerivedData/**/Build/Products/Debug-iphonesimulator/*.app
-
-  ios-device-unsigned:
+        script: xcodebuild -project KurierX.xcodeproj -scheme KurierX -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+  ios-unsigned:
     name: KurierX iPhone Unsigned Build
     instance_type: mac_mini_m2
     max_build_duration: 30
@@ -41,25 +31,15 @@ workflows:
         script: xcodegen generate
       - name: Resolve Swift packages
         script: |
-          set -e
-          for attempt in 1 2 3; do
-            if xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX; then
-              exit 0
-            fi
-            echo "Swift package resolve failed (attempt $attempt/3); retrying in 15s..."
-            sleep 15
+          for i in 1 2 3; do
+            xcodebuild -resolvePackageDependencies -project KurierX.xcodeproj -scheme KurierX && break
+            echo "Resolve failed, retry $i/3"; sleep 12
           done
-          exit 1
-      - name: Build for physical iPhone without signing
+      - name: Build unsigned device app
         script: |
-          set -euo pipefail
-          xcodebuild -project KurierX.xcodeproj -scheme KurierX -sdk iphoneos -configuration Release -derivedDataPath "$CM_BUILD_DIR/DerivedData" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | xcpretty
-          APP="$CM_BUILD_DIR/DerivedData/Build/Products/Release-iphoneos/KurierX.app"
-          test -d "$APP"
-          mkdir -p "$CM_BUILD_DIR/ipa/Payload"
-          cp -R "$APP" "$CM_BUILD_DIR/ipa/Payload/KurierX.app"
-          cd "$CM_BUILD_DIR/ipa"
-          zip -qry "$CM_BUILD_DIR/KurierX-unsigned.ipa" Payload
+          xcodebuild -project KurierX.xcodeproj -scheme KurierX -sdk iphoneos -configuration Release -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/KurierX.app Payload/
+          zip -r KurierX-unsigned.ipa Payload
     artifacts:
       - KurierX-unsigned.ipa
-      - DerivedData/Build/Products/Release-iphoneos/KurierX.app
